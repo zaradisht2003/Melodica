@@ -1,4 +1,5 @@
 import StmtFSM :: *;
+import Cur_Cycle :: *;
 import FIFOF        :: *;
 import FIFO        :: *;
 import SpecialFIFOs :: *;

@@ -1,32 +1,10 @@
-// Copyright (c) HPC Lab, Department of Electrical Engineering, IIT Bombay
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
-
-package PositCore;
+package PositCore_accel;
 import Cur_Cycle :: *;
 
 // --------------------------------------------------------------
 // This package implements the top-level of the Posit Arithmetic Unit that
 // integrates into Clarinet's pipeline as a functional unit peer of the FPU.
-//
-// Known Problems:
-//    1. DIV pipeline hangs
+// ifdef ACCEL macros are used in Quills
 // --------------------------------------------------------------
 
 // Library imports
@@ -59,6 +37,9 @@ import Posit_Numeric_Types :: *;
 import Posit_User_Types :: *;
 import Utils  :: *;
 
+
+
+
 // Standalone compilation independent of a RISC-V core
 `ifdef STANDALONE
 // Type definitions
@@ -69,6 +50,9 @@ typedef union tagged {
    FDouble D;
    FSingle S;
    Bit #(PositWidth) P;
+`ifdef ACCEL
+	Quire_Acc Q;
+`endif
 } FloatU deriving (Bits, Eq, FShow);
 
 typedef Tuple2#( FloatU, FloatingPoint::Exception ) Fpu_Rsp;
@@ -91,6 +75,10 @@ typedef enum {
 `endif
    , FCVT_P_R
    , FCVT_R_P
+`ifdef ACCEL
+		,RD_Q
+		,RST_Q
+`endif
 } PositCmds deriving (Bits, Eq, FShow);
 
 typedef Tuple4 #(FloatU, FloatU, RoundMode, PositCmds) Posit_Req;
@@ -103,7 +91,7 @@ endinterface
 (* synthesize *)
 `ifdef STANDALONE
 module mkPositCore (PositCore_IFC);
-   Bit #(2) verbosity = 2;
+   Bit #(2) verbosity = 1;
 `else
 module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
 `endif
@@ -123,7 +111,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
    // Divider part of FDA/FDS
    Server #(  Tuple2 #(  Posit_Extract
                        , Posit_Extract)
-            , Quire_Acc)               divider        <- mkDivider (verbosity);
+            , Quire_Acc)               divider        <- mkMultiplier (verbosity);
 `endif
 
    // The Quire -- includes the accumulator for fused operations
@@ -135,14 +123,15 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
    Server #(Posit_Extract, Float_Extract)    ptof     <- mkPtoF_PNE (verbosity);        
 `endif
 
-   FIFO #(PositCmds)                   cmd_stg2_f     <- mkFIFO;
-   FIFO #(PositCmds)                   cmd_stg3_f     <- mkFIFO;
+`ifdef ACCEL
+   Reg #(Bit#(3))  ops_in_flight[3]	<- mkCReg(3,0);
+`endif	
 
-   FIFO #(Posit_Req)                   ffI            <- mkFIFO;
-   FIFO #(Fpu_Rsp)                     ffO            <- mkFIFO1;
+   FIFO #(PositCmds)                   cmd_stg2_f     <- mkSizedFIFO(4);
+   FIFO #(PositCmds)                   cmd_stg3_f     <- mkSizedFIFO(4);
 
-   // Operations that update quire that are in flight through the posit core
-   Reg #(Bit #(8))                     rg_inflight    <- mkReg(0);
+   FIFO #(Posit_Req)                   ffI            <- mkSizedFIFO(4);
+   FIFO #(Fpu_Rsp)                     ffO            <- mkSizedFIFO(4);
 
 
    let no_excep = FloatingPoint::Exception {
@@ -164,23 +153,17 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
 `endif
    );
 `ifndef ONLY_POSITS
-   rule extract_stg1 ((cmd != FCVT_P_S) && (cmd != FCVT_P_R));
+   rule extract_stg1 ((cmd != FCVT_P_S) && (cmd != FCVT_P_R) && (cmd != RD_Q) && (cmd != RST_Q));
 `else
-   rule extract_stg1 (cmd != FCVT_P_R);
+   rule extract_stg1 ((cmd != FCVT_P_R) && (cmd != RD_Q) && (cmd != RST_Q));
 `endif
       extracter1.request.put (op1.P);
       extracter2.request.put (is_negating_op ? twos_complement (op2.P) : op2.P);
       cmd_stg2_f.enq (cmd);
       ffI.deq;
-
-      // If the cmd leads to a quire update, increment the inflight counter
-      if (   (cmd == FMA_P)
-          || (cmd == FMS_P)
-`ifdef INCLUDE_PDIV
-          || (cmd == FDA_P)
-          || (cmd == FDS_P)
+`ifdef ACCEL
+			ops_in_flight[0] <= ops_in_flight[0] + 1;
 `endif
-          || (cmd == FCVT_R_P)) rg_inflight <= rg_inflight + 1;
 
       if (verbosity > 1)
          $display ("%0d: %m: rl_extract_stg1: ", cur_cycle, fshow (cmd));
@@ -200,10 +183,8 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       end
    endrule
 `endif
- 
-   // Initiate a read of the quire. Wait for all inflight operations to complete
-   // before doing so.
-   rule rl_read_quire_stg1 ((rg_inflight == 0) && (cmd == FCVT_P_R));
+
+   rule rl_read_quire_stg1 (cmd == FCVT_P_R); 
       quire.read_req;
       cmd_stg2_f.enq (cmd);
       ffI.deq;
@@ -212,6 +193,26 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
          $display ("%0d: %m.rl_read_quire_stg1: read ", cur_cycle);
    endrule
 
+`ifdef ACCEL
+   rule rl_read_quire (cmd == RD_Q && ops_in_flight[2] == 3'b0);
+      let z = quire.read_quire;
+	  FloatU quire_out = tagged Q z;
+      ffO.enq (tuple2(quire_out,no_excep));
+      ffI.deq;
+
+      if (verbosity > 1)
+         $display ("%0d: %m.rl_read_quire: quire output ", cur_cycle);
+   endrule
+
+   rule rl_reset_quire (cmd == RST_Q && ops_in_flight[2] == 3'b0);
+	  let p = Posit_Extract {ziflag : ZERO};
+      quire.init.put(p);
+      ffI.deq;
+
+      if (verbosity > 1)
+         $display ("%0d: %m.rl_reset_quire ", cur_cycle);
+   endrule
+`endif
    // --------
    // Fused Operation MUL/DIV Phase: Stage 2
    let cmd_stg2 = cmd_stg2_f.first;
@@ -225,10 +226,11 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       multiplier.request.put (tuple2 (ext_out1, ext_out2));
       cmd_stg3_f.enq (cmd_stg2); cmd_stg2_f.deq;
 
-      // This operation is marked complete before dispatching to PositCore.
       // Complete this operation as far as the CPU is concerned
-      // FloatU posit_out = tagged P 0;
-      // ffO.enq(tuple2(posit_out, no_excep));
+      FloatU posit_out = tagged P 0;
+	`ifndef ACCEL
+      ffO.enq(tuple2(posit_out, no_excep));
+	`endif
 
       if (verbosity > 1) begin
          $display ("%0d: %m.rl_fma_stg2: multiply ", cur_cycle);
@@ -248,6 +250,12 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       let ext_out2 <- extracter2.response.get();
       divider.request.put (tuple2 (ext_out1, ext_out2));
       cmd_stg3_f.enq (cmd_stg2); cmd_stg2_f.deq;
+
+      // Complete this operation as far as the CPU is concerned
+      FloatU posit_out = tagged P 0;
+	`ifndef ACCEL
+      ffO.enq(tuple2(posit_out, no_excep));
+	`endif
 
       if (verbosity > 1) begin
          $display ("%0d: %m.rl_fda_stg2: divide ", cur_cycle);
@@ -291,13 +299,14 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
    rule rl_init_quire_stg2 (cmd_stg2 == FCVT_R_P);
       let ext_out1 <- extracter1.response.get();
       let discard  <- extracter2.response.get();
-      quire.init (ext_out1);
+      quire.init.put (ext_out1);
       cmd_stg2_f.deq;
 
-      // As far as this operation is concerned, it is no longer inflight as the
-      // quire has internal flow control to stop reads when it is
-      // accumulating/initializing
-      rg_inflight <= rg_inflight - 1;
+      // Complete this operation as far as the CPU is concerned
+      FloatU posit_out = tagged P 0;
+	`ifndef ACCEL
+      ffO.enq(tuple2(posit_out, no_excep));
+	`endif
 
       if (verbosity > 1) begin
          $display ("%0d: %m.rl_init_quire_stg2: initialize ", cur_cycle);
@@ -326,13 +335,12 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
    // Stage 3: FMA/FMS Compute: Accumulate
    rule rl_fma_stg3 ((cmd_stg3 == FMA_P) || (cmd_stg3 == FMS_P));
       let quire_increment <- multiplier.response.get ();
-      quire.accumulate (quire_increment);
+      quire.accumulate.put (quire_increment);
       cmd_stg3_f.deq;
 
-      // As far as this operation is concerned, it is no longer inflight as the
-      // quire has internal flow control to stop reads when it is
-      // accumulating/initializing
-      rg_inflight <= rg_inflight - 1;
+`ifdef ACCEL
+			ops_in_flight[1] <= ops_in_flight[1] - 1;
+`endif
 
       if (verbosity > 1) begin
          $display ("%0d: %m.rl_fma_stg3: accumulate ", cur_cycle);
@@ -345,13 +353,12 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
    // Stage 3: FDA/FDS Compute: Accumulate
    rule rl_fda_stg3 ((cmd_stg3 == FDA_P) || (cmd_stg3 == FDS_P));
       let quire_increment <- divider.response.get ();
-      quire.accumulate (quire_increment);
+      quire.accumulate.put (quire_increment);
       cmd_stg3_f.deq;
 
-      // As far as this operation is concerned, it is no longer inflight as the
-      // quire has internal flow control to stop reads when it is
-      // accumulating/initializing
-      rg_inflight <= rg_inflight - 1;
+`ifdef ACCEL
+			ops_in_flight[1] <= ops_in_flight[1] - 1;
+`endif
 
       if (verbosity > 1) begin
          $display ("%0d: %m.rl_fda_stg3: accumulate ", cur_cycle);

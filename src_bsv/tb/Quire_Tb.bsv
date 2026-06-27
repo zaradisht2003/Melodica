@@ -1,0 +1,392 @@
+// Copyright (c) HPC Lab, Department of Electrical Engineering, IIT Bombay
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.package Extracter_Types;
+//
+package Quire_Tb;
+import Cur_Cycle :: *;
+//
+// -----------------------------------------------------------------
+// This package defines:
+//
+// mkTestbench : Tests Quire functionality. Test sequences:
+//   1. quire.init, quire.read, (input == output) => PASS
+//   2. quire.init, (quire.accumulate * x), quire.read
+//      Compare with posit adder output. The accumulate input can be
+//      driven by sending (posit, 1) to the multiplier.
+// Supports running on FPGA. Exhaustive testing of sequence 1 possible
+// on FPGA for all supported posit sizes.
+// -----------------------------------------------------------------
+//
+import Vector              :: *;
+import FIFO                :: *;
+import GetPut              :: *;
+import ClientServer        :: *;
+import FShow               :: *;
+import LFSR                :: *;
+import StmtFSM             :: *;
+
+import Utils               :: *;
+import Posit_Numeric_Types :: *;
+import Posit_User_Types    :: *;
+import Quire               :: *;
+import Normalizer          :: *;
+import Extracter           :: *;
+import Fused_Commons       :: *;
+import Multiplier_fma      :: *;
+import Divider_fda         :: *;
+
+// Number of random tests to be run
+`ifdef P8
+typedef 255 Num_Tests;
+`elsif P16
+typedef 8192 Num_Tests;
+`elsif P32
+typedef 8192 Num_Tests;
+`endif
+
+
+// --------
+// A directed TB to test accumulation into the quire
+// --------
+(* synthesize *)
+module mkAccTb (Empty);
+   Bit #(2) verbosity = 3;
+
+   // Extracter for init operations
+   Server #(Posit, Posit_Extract)   extracterA     <- mkExtracter (verbosity);
+   Server #(Posit, Posit_Extract)   extracterB     <- mkExtracter (verbosity);
+
+   // Output normalizer
+   Server #(  Prenorm_Posit
+            , Norm_Posit)           normalizer     <- mkNormalizer (verbosity);
+
+   // Multiplier part of FMA/FMS
+   Server #(  Tuple2 #(  Posit_Extract
+                       , Posit_Extract)
+            , Quire_Acc)            multiplier     <- mkMultiplier (verbosity);
+
+   // Divider part of FDA/FDS
+   Server #(  Tuple2 #(  Posit_Extract
+                       , Posit_Extract)
+            , Quire_Acc)            divider        <- mkDivider (verbosity);
+
+   Quire_IFC                        quire          <- mkQuire (verbosity);
+
+
+   function Action fa_in_posits (Posit a, Posit b);
+      action
+         extracterA.request.put (a);
+         extracterB.request.put (b);
+      endaction
+   endfunction
+
+   function Action fa_ext_to_mul;
+      action
+         let ext_outA <- extracterA.response.get();
+         let ext_outB <- extracterB.response.get();
+         multiplier.request.put (tuple2 (ext_outA, ext_outB));
+      endaction
+   endfunction
+
+   function Action fa_ext_to_div;
+      action
+         let ext_outA <- extracterA.response.get();
+         let ext_outB <- extracterB.response.get();
+         divider.request.put (tuple2 (ext_outA, ext_outB));
+      endaction
+   endfunction
+
+   function Action fa_mul_acc;
+      action
+         let mul_out <- multiplier.response.get ();
+         quire.accumulate (mul_out);
+      endaction
+   endfunction
+
+   function Action fa_div_acc;
+      action
+         let div_out <- divider.response.get ();
+         quire.accumulate (div_out);
+      endaction
+   endfunction
+
+   function Action fa_quire_norm;
+      // Read Quire response. Normalize.
+      action
+         let o <- quire.read_rsp.get ();
+         normalizer.request.put (o);
+      endaction
+   endfunction
+
+   function Action fa_check_response (Integer test, Posit expected);
+      action
+         // Normalize output. Check
+         let o <- normalizer.response.get ();
+         if (o.posit == expected)
+            $display ("Test %0d PASS.", test);
+         else 
+            $display ("Test %0d FAIL. (Expected 0x%0h) (Actual 0x%0h)"
+               , test, expected, o);
+      endaction
+   endfunction
+
+   function Stmt fa_mul_test (Integer test, Posit a, Posit b, Posit result);
+      return (
+         seq
+            fa_in_posits (a, b);
+            fa_ext_to_mul ();    // A * B
+            fa_mul_acc ();       // Q = Q + (A * B)
+            quire.read_req;      // Read Quire
+            fa_quire_norm ();
+            fa_check_response (test, result);
+         endseq
+      );
+   endfunction
+
+   function Stmt fa_div_test (Integer test, Posit a, Posit b, Posit result);
+      return (
+         seq
+            fa_in_posits (a, b);
+            fa_ext_to_div ();    // A / B
+            fa_div_acc ();       // Q = Q + (A / B)
+            quire.read_req;      // Read Quire
+            fa_quire_norm ();
+            fa_check_response (test, result);
+         endseq
+      );
+   endfunction
+
+   mkAutoFSM (
+      seq
+         seq
+            // Test 1:
+            //         Quire = 0, A = 1.125, B = 2.0
+            //         Accumulate (A,B) (result: 2.25)
+            //         Read             (result: 0x5200). Check.
+            extracterA.request.put (0);
+            action
+               let ext_out <- extracterA.response.get();
+               quire.init (ext_out);               // Quire = 0
+            endaction
+
+            fa_mul_test (1, 16'h4200, 16'h5000, 16'h5200);
+         endseq
+
+         // Test 2:
+         //         A = 1.125, B = 2.0
+         //         Accumulate (A,B) (result: 4.50)
+         //         Read             (result: 0x6100). Check.
+         fa_mul_test (2, 16'h4200, 16'h5000, 16'h6100);
+
+         // Test 3:
+         //         A = -1.125, B = 2.0
+         //         Accumulate (A,B) (result: 2.25)
+         //         Read             (result: 0x5200). Check.
+         fa_mul_test (3, 16'hBE00, 16'h5000, 16'h5200);
+
+         // Test 4:
+         //         A = -1.125, B = 2.0
+         //         Accumulate (A,B) (result: 0.00)
+         //         Read             (result: 0x0000). Check.
+         fa_mul_test (4, 16'hBE00, 16'h5000, 16'h0000);
+
+         // Test 5:
+         //         A = 4.50, B = 2.0
+         //         Div-Accumulate (A,B) (result: 2.25)
+         //         Read             (result: 0x5200). Check.
+         fa_div_test (5, 16'h6100, 16'h5000, 16'h5200);
+      endseq
+   );
+
+endmodule
+
+
+// --------
+// Exhaustive testbench to initialize and read back the quire.
+// --------
+typedef enum {SEED, TST, STOP} TB_State deriving (Bits, Eq, FShow);
+typedef enum {EXT, INIT, READREQ, READRSP, NORM} COMP_State deriving (Bits, Eq, FShow);
+
+(* synthesize *)
+`ifdef FPGA
+module mkInitReadTb (LED_IFC);
+`else
+module mkInitReadTb (Empty);
+`endif
+
+Bit #(2) verbosity = 3;
+
+`ifdef RANDOM
+LFSR  #(Bit #(32))               lfsr1          <- mkLFSR_32;
+`endif
+
+// Extracter for init operations
+Server #(Posit, Posit_Extract)   extracter      <- mkExtracter (verbosity);
+
+// Output normalizer
+Server #(  Prenorm_Posit
+         , Norm_Posit)           normalizer     <- mkNormalizer (verbosity);
+
+Quire_IFC                        quire          <- mkQuire (verbosity);
+
+FIFO  #(Bit #(PositWidth))       posit_in_f     <- mkFIFO;
+Reg   #(TB_State)                rg_tb_state    <- mkReg (SEED);
+Reg   #(COMP_State)              rg_comp_state  <- mkReg (EXT);
+Reg   #(Bit #(PositWidth))       rg_ip_num      <- mkReg (0);
+Reg   #(Bool)                    rg_error       <- mkReg (False);
+
+Posit posit_NaR = 1 << (valueOf (PositWidth)-1);
+
+function Action fa_report_test_pass;
+   action
+`ifdef FPGA
+   noAction;
+`else
+   $display ("%0d: %m: ALL TEST PASS", cur_cycle);
+   $finish;
+`endif
+   endaction
+endfunction
+
+function Action fa_report_test_fail (Bit #(PositWidth) test_num);
+   action
+   rg_error <= True;
+`ifndef FPGA
+   $display ("%0d: %m: TEST FAILURE: %0d", cur_cycle, test_num);
+   $finish;
+`endif
+   endaction
+endfunction
+
+// -----------------------------------------------------------------
+
+rule rl_seed_lfsr (rg_tb_state == SEED);
+`ifdef RANDOM
+   lfsr1.seed('h12345678); // to create different random series
+`endif
+   rg_tb_state <= TST;
+   rg_comp_state <= EXT;
+endrule
+
+rule rl_tst_ext ((rg_tb_state == TST) && (rg_comp_state == EXT));
+`ifdef RANDOM
+   // Get random posit from LFSR
+   Posit inPosit = truncate (lfsr1.value());
+   lfsr1.next ();
+`else
+   // Get posit from counter
+   Posit inPosit = truncate (rg_ip_num);
+`endif
+
+   extracter.request.put (inPosit);
+   rg_comp_state <= INIT;
+
+   // Bookkeeping
+   rg_ip_num <= rg_ip_num + 1;
+   posit_in_f.enq (inPosit);
+
+   if (verbosity > 0) begin
+      $display ("%0d: %m.rl_tst_ext: Test %d ", cur_cycle, (rg_ip_num+1));
+      if (verbosity > 1)
+         $display ("   inPosit: 0x%08h", inPosit);
+   end
+endrule
+
+rule rl_tst_init ((rg_tb_state == TST) && (rg_comp_state == INIT));
+   let ext_out <- extracter.response.get();
+   quire.init (ext_out);
+   rg_comp_state <= READREQ;
+   if (verbosity > 0) begin
+      $display ("%0d: %m.rl_tst_init: Test %d ", cur_cycle, rg_ip_num);
+      if (verbosity > 1)
+         $display ("   ext_out1: ", fshow (ext_out));
+   end
+endrule
+
+rule rl_tst_readreq ((rg_tb_state == TST) && (rg_comp_state == READREQ));
+   quire.read_req;
+   rg_comp_state <= READRSP;
+
+   if (verbosity > 0) begin
+      $display ("%0d: %m.rl_tst_readreq: Test %d ", cur_cycle, rg_ip_num);
+   end
+endrule
+
+rule rl_tst_readrsp ((rg_tb_state == TST) && (rg_comp_state == READRSP));
+   let o <- quire.read_rsp.get ();
+   normalizer.request.put (o);            
+   rg_comp_state <= NORM;
+
+   if (verbosity > 0) begin
+      $display ("%0d: %m.rl_tst_readrsp: Test %d ", cur_cycle, rg_ip_num);
+      if (verbosity > 1)
+         $display ("   quire out: ", fshow (o));
+   end
+endrule
+
+rule rl_tst_norm ((rg_tb_state == TST) && (rg_comp_state == NORM));
+   let norm_out <- normalizer.response.get ();
+   let posit_in = posit_in_f.first; posit_in_f.deq;
+   rg_comp_state <= EXT;
+
+   Bool stop_condn = False;
+
+`ifdef RANDOM
+   // Stop condition
+   stop_condn = (rg_ip_num == fromInteger (valueOf (Num_Tests)));
+`else
+   // Stop condition
+   stop_condn = (rg_ip_num == 0);
+`endif
+
+   if (verbosity > 0) begin
+      $display ("%0d: %m.rl_tst_norm: Test %d ", cur_cycle, rg_ip_num);
+      if (verbosity > 1) begin
+         $display ("   norm_out: ", fshow (norm_out));
+         $display ("   posit_in: ", fshow (posit_in));
+      end
+   end
+
+   // Stop the test or continue
+   if (stop_condn) begin
+      if (posit_in != norm_out.posit) fa_report_test_fail (rg_ip_num - 1);
+      else if (rg_error) fa_report_test_fail (rg_ip_num - 1);
+      else fa_report_test_pass;
+      rg_tb_state <= STOP;
+   end
+   else begin
+      // Ignore checks for NaR
+      if ((posit_in != norm_out.posit) && (posit_in != posit_NaR))
+         fa_report_test_fail (rg_ip_num - 1);
+   end
+
+endrule
+
+`ifdef FPGA
+(* always_ready *)
+method Bool running = (rg_tb_state != STOP);
+(* always_ready *)
+method Bool test_pass = ((rg_tb_state == STOP) && !rg_error);
+(* always_ready *)
+method Bool test_fail = rg_error;
+`endif
+endmodule
+
+
+endpackage

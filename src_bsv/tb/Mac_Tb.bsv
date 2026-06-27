@@ -20,6 +20,7 @@
 
 
 package Mac_Tb;
+import Cur_Cycle :: *;
 
 // -----------------------------------------------------------------
 // This package defines:

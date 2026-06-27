@@ -1,5 +1,6 @@
 // Testbench to verify a bunch of FMAs to PositCore and PositCore_accel
 import StmtFSM :: *;
+import Cur_Cycle :: *;
 import FIFOF        :: *;
 import FIFO        :: *;
 import SpecialFIFOs :: *;

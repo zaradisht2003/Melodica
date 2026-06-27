@@ -1,4 +1,5 @@
 package Utils;
+import Cur_Cycle :: *;
 
 // ================================================================
 // Copyright (c) 2013-2016 Bluespec, Inc. All Rights Reserved.
@@ -14,5 +15,14 @@ ActionValue #(Bit #(32)) cur_cycle = actionvalue
 				     endactionvalue;
 
 // ================================================================
+
+interface LED_IFC;
+   (* always_ready *)
+   method Bool running;
+   (* always_ready *)
+   method Bool test_pass;
+   (* always_ready *)
+   method Bool test_fail;
+endinterface
 
 endpackage
