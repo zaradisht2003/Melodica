@@ -171,133 +171,132 @@ module mkNormalizer #(Bit #(2) verbosity) (Server #(Prenorm_Posit, Norm_Posit));
 
    interface Put request;
       method Action put (Prenorm_Posit p);
-         // interpreting scale value into regime and exponent   
-         match { .k, .no_of_bit_k } = fv_calculate_regime (p.scale [valueOf(ScaleWidth):es_int]);
-
-         // carrying exponent field forward (don't care if es = 0)
+         // B-Posit implementation
+         Int#(ScaleWidthMinusExpWidthPlus1) k_val_signed = unpack(p.scale [valueOf(ScaleWidth):es_int]);
          Bit#(ExpWidth) expo = (es_int == 0) ? 0 : p.scale[es_int-1:0];
+         Bit#(FracWidth) frac = p.frac;
+         Bit#(1) frac_msb = p.frac_msb;
+         Bit#(1) frac_zero = p.frac_zero;
 
-         // shift gives the number of bits have shifted so that the exponent bit
-         // can be directly added to the regime field
-
-         // shift the exponent field by 0 if the exponent field forms the last
-         // bits of the posit number
-
-         // shift_new = the number of bits the fraction has to be shifted so as to
-         // accomodate exponent bits the unavalibility of bits to store it in the
-         // input
-
-         // shift_new = the number of overlap bits between regime and exponent
-         // mask : see which exponent to be used
-         let n_2_k = (n_2_int-no_of_bit_k);
-         match{.shift0, .shift_new0, .expo_masked} = fv_expo_window_mask(n_2_k,expo);
-
-         // we bound the sum of k and expo to maximum if it exceeds
-         // k + shift expo depending on available bits
-         UInt#(PositWidthMinus1) uint_k_expo = boundedPlus(unpack(k) , unpack(extend(expo_masked)<<shift0));
-         Bit#(FracWidth) frac = truncate({(n_2_k == 0?1'b0:1'b1),p.frac}>>shift_new0);
-             //combining the regime and exponent field
-          Bit#(PositWidthMinus1) k_expo = pack(uint_k_expo);
-             // see the case where there is no available space to accomodate exponent and the there is no shift in fraction snce all frac bits will be lost
-          Bit#(1) flag_endcase = pack(n_2_k == 0 && shift_new0 == 0); 
-             //carrying forward msb of truncated fraction bits
-             //if there is no shift in fraction msb remains but if there is change we have to use the last bit of the frac bits lost
-             Bit#(1) truncated_frac_msb = shift_new0 == 0 ? p.frac_msb : p.frac [shift_new0-1];
-             //carrying forward truncated_frac_zero
-             //if there is no shift in truncated_frac_zero remains but if there is a shift we have to see the new rounded frac bits, old truncated_frac_msb and old truncated_frac_zero
-             Bit#(1) truncated_frac_zero = shift_new0 == 0 ? p.frac_zero :(shift_new0 == fromInteger(1) ?  p.frac_zero & (~p.frac_msb) : p.frac_zero & (~p.frac_msb) & ((unpack(p.frac[shift_new0-2:0]) ==  0)? 1'b1 : 1'b0));
-             `ifdef RANDOM_PRINT
-             $display("shift0 %b shift_new0 %b expo_new %b p.frac %b n_2_k %b expo %b truncated_frac_msb %b truncated_frac_zero %b ",shift0, shift_new0, expo_masked,p.frac,n_2_k,expo,truncated_frac_msb,truncated_frac_zero);
-             $display("k %b",k);
-             $display("no_of_bit_k %b",no_of_bit_k);
-             `endif
-
-         //shift_2 gives the shift in fraction bits
-         let shift_2 = fromInteger(valueOf(FracWidth))-shift0;
-         //expo_even tells if exponent field's lsb is 0/1; see this only if #frac bits = 0; in other cases it is 1
-         // see if we have even expo or odd expo
-         Bit#(1) expo_even = (shift0 == 0 ? ~(k_expo[0]) : 1'b1);
-         // in rounding a few bits will be lost so depending on the bits lost we round the number 
-         //flag_prev_truncate tells if the last bit lost is from truncated frac or the present frac
-         //require it to round the number to nearest value
-         Bit#(1) flag_prev_truncate = ((shift_2) == 0) ? truncated_frac_msb : (frac[shift_2-1]);
-
-         // flag_equidistant tells if it is equidistant from the
-         // posits that can be represented
-
-         // check if the fraction is equidistnat or not for rounding
-
-         // cases that need to be checked for to see if fraction
-         // bits that are being truncated is equidistant or not
-         // as then we have to go to the nearest even. 
-
-         // Rounding rules: frac bits lost in the last shifting are 
-         // a) more than 1 (shift_2>1): then the msb lost(flag_prev_truncate)
-         // should be 1, all other bits truncated due to the shifting should be 0s
-         // & other bits that need to be ensured to be 0 include
-         // truncated_frac_msb should be 0 & truncated_frac_zero should be 1 and
-         // finally only is the last fraction bit being used is 1 then only we
-         // have to add 1 and round it to even  
-
-         // b) is equal to 1(shift_2 ==1): then the msb lost(flag_prev_truncate)
-         // should be 1 & other bits that need to be ensured to be 0 include
-         // truncated_frac_msb that should be 0 & truncated_frac_zero that should
-         // be 1 and finally only is the last fraction bit being used is 1 then
-         // only we have to add 1 and round it to even 
-
-         // c) is equal to 0(shift_2 ==0): then the msb lost(flag_prev_truncate
-         // which is also equal to truncated_frac_msb) should be 1 & other bits
-         // that need to be ensured to be 0 include truncated_frac_zero that
-         // should be 1 and finally only is the last fraction bit being used is 1
-         // then only we have to add 1 and round it to even  
-
-         // d) all bits(shift0 == 0): then the msb lost(flag_prev_truncate which
-         // is also equal to truncated_frac_msb) should be 1 & other bits that
-         // need to be ensured to be 0 include truncated_frac_zero that should be
-         // 1 and finally since all fraction bits are lost then the last bit in
-         // the number will be exponent bit so we have to check if that is even or
-         // not and so decide the rounding bit 
-
-         // case2: flag_endcase states if all expo(other than when es = 0) and
-         // frac bits are being truncated we check if the flag_prev_truncate is 0  
-
-         // case3: when k_expo is all 1s and all frac bits are being truncated and
-         // frac and all other bits are 0 it will be equidistant even if expo bits
-         // is zero (other than when es = 0)
-
-         Bit#(1) flag_equidistant = 1'b0;
-         if(shift_2>= 0)
-            if(frac[shift_2] == 1'b0 && flag_prev_truncate == 1'b1 && truncated_frac_zero == 1'b1 && expo_even == 1'b1)
-               if(shift_2 == 0)
-                  flag_equidistant = 1'b1;
-               else if(shift_2 == 1 && truncated_frac_msb == 1'b0 )
-                  flag_equidistant = 1'b1;
-               else if(shift_2>=2 && unpack(frac[shift_2-2:0]) ==  0 && truncated_frac_msb == 1'b0)
-                  flag_equidistant = 1'b1;
-         else if(flag_endcase == 1'b1 && flag_prev_truncate == 1'b1 && (es_int != 0)) 
-            flag_equidistant = 1'b1;
-         else if(k_expo == '1 && shift0 == 0 && frac ==  0 && truncated_frac_zero == 1'b1 &&  truncated_frac_msb == 1'b0 && (es_int != 0))
-            flag_equidistant = 1'b1;
-         else
-            flag_equidistant = 1'b0;
-
-         //we bound the sum of k expo and frac to maximum if it exceeds
-         //k_expo + shifted fraction bits + if the prev truncated bit is 1/0 - if the number is equidistant
-         UInt#(PositWidthMinus1) uint_k_expo_frac = boundedPlus(unpack(k_expo +(extend(frac)>>(shift_2))-extend(flag_equidistant)),unpack(extend(flag_prev_truncate)));
-         uint_k_expo_frac = uint_k_expo_frac + extend(uint_k_expo_frac == 0 && flag_equidistant == 0 ?1'b1:1'b0);
+         // Saturation for B-Posit regime limit [-6, 5]
+         if (k_val_signed > 5) begin
+             k_val_signed = 5;
+             expo = '1;
+             frac = '1;
+             frac_msb = 0;
+             frac_zero = 1;
+         end else if (k_val_signed < -6) begin
+             k_val_signed = -6;
+             expo = '0;
+             frac = '0;
+             frac_msb = 0;
+             frac_zero = 1;
+         end
          
-         Bool rounding = (flag_prev_truncate - flag_equidistant == 1'b1 || uint_k_expo_frac == 0 && flag_equidistant == 0);
-         `ifdef RANDOM_PRINT
-         $display("p.sign %b",p.sign);
-         $display("k_expo %b frac %b uint_k_expo_frac %b flag_endcase %b",k_expo,frac,uint_k_expo_frac,flag_endcase);
-         $display(" shift0 %b shift_2 %b flag_prev_truncate %b flag_equidistant %b",shift0,shift_2,flag_prev_truncate,flag_equidistant);
-         $display(" p.zero_infinity_flag %b",p.zero_infinity_flag);
-         `endif
+         Int#(4) k_val = truncate(k_val_signed);
+         
+         Bit#(6) regime_bits;
+         UInt#(3) regime_len; // 2 to 6
+         
+         case (k_val)
+             5:  begin regime_bits = 6'b111111; regime_len = 6; end
+             4:  begin regime_bits = 6'b111110; regime_len = 6; end
+             3:  begin regime_bits = 6'b111100; regime_len = 5; end
+             2:  begin regime_bits = 6'b111000; regime_len = 4; end
+             1:  begin regime_bits = 6'b110000; regime_len = 3; end
+             0:  begin regime_bits = 6'b100000; regime_len = 2; end
+             -1: begin regime_bits = 6'b010000; regime_len = 2; end
+             -2: begin regime_bits = 6'b001000; regime_len = 3; end
+             -3: begin regime_bits = 6'b000100; regime_len = 4; end
+             -4: begin regime_bits = 6'b000010; regime_len = 5; end
+             -5: begin regime_bits = 6'b000001; regime_len = 6; end
+             -6: begin regime_bits = 6'b000000; regime_len = 6; end
+         endcase
+
+         // Calculate shift for fraction (S = regime_len - 2)
+         UInt#(3) S = regime_len - 2; // 0 to 4
+         
+         // Calculate the shifted fraction and rounding bits
+         Bit#(FracWidth) shifted_frac = frac >> S;
+         
+         Bit#(1) flag_prev_truncate;
+         Bit#(1) truncated_frac_zero;
+         Bit#(1) truncated_frac_msb;
+         
+         if (S == 0) begin
+             flag_prev_truncate = frac_msb;
+             truncated_frac_zero = frac_zero;
+             truncated_frac_msb = frac_msb;
+         end else if (S == 1) begin
+             flag_prev_truncate = frac[0];
+             truncated_frac_zero = frac_zero & (~frac_msb);
+             truncated_frac_msb = frac_msb;
+         end else if (S == 2) begin
+             flag_prev_truncate = frac[1];
+             truncated_frac_zero = frac_zero & (~frac_msb) & (~frac[0]);
+             truncated_frac_msb = frac[0];
+         end else if (S == 3) begin
+             flag_prev_truncate = frac[2];
+             truncated_frac_zero = frac_zero & (~frac_msb) & (~frac[0]) & (~frac[1]);
+             truncated_frac_msb = frac[1];
+         end else begin // S == 4
+             flag_prev_truncate = frac[3];
+             truncated_frac_zero = frac_zero & (~frac_msb) & (~frac[0]) & (~frac[1]) & (~frac[2]);
+             truncated_frac_msb = frac[2];
+         end
+
+         // Combine regime, exponent, and shifted fraction
+         // Total bits for magnitude = PositWidth - 1
+         // Magnitude = {regime_bits[5:6-regime_len], expo, shifted_frac[FracWidth-1 : S]}
+         Bit#(PositWidthMinus1) magnitude = 0;
+         
+         // Build a PositWidthMinus1 bit string
+         Bit#(PositWidthMinus1) padded_regime = extend(regime_bits);
+         padded_regime = padded_regime << (valueOf(PositWidthMinus1) - 6);
+         
+         // Shift the regime to the very top
+         Bit#(PositWidthMinus1) padded_expo = extend(expo);
+         padded_expo = padded_expo << (valueOf(PositWidthMinus1) - 6 - es_int);
+         
+         Bit#(PositWidthMinus1) padded_frac = extend(shifted_frac);
+         
+         // Assemble using OR and shifts
+         // Note: regime is left-aligned. Exponent starts after regime_len bits.
+         // Fraction starts after regime_len + es_int bits.
+         
+         // Create masks or shifts dynamically (BSV barrel shifter)
+         // Wait, B-Posit limits it to a MUX!
+         Bit#(PositWidthMinus1) assembled_mag = 0;
+         if (S == 0) begin // regime_len == 2
+             assembled_mag = {regime_bits[5:4], expo, shifted_frac[valueOf(FracWidth)-1:0]};
+         end else if (S == 1) begin // regime_len == 3
+             assembled_mag = {regime_bits[5:3], expo, shifted_frac[valueOf(FracWidth)-1:1]};
+         end else if (S == 2) begin // regime_len == 4
+             assembled_mag = {regime_bits[5:2], expo, shifted_frac[valueOf(FracWidth)-1:2]};
+         end else if (S == 3) begin // regime_len == 5
+             assembled_mag = {regime_bits[5:1], expo, shifted_frac[valueOf(FracWidth)-1:3]};
+         end else begin // S == 4, regime_len == 6
+             assembled_mag = {regime_bits[5:0], expo, shifted_frac[valueOf(FracWidth)-1:4]};
+         end
+         
+         // Rounding logic
+         Bit#(1) expo_even = (es_int == 0) ? ~regime_bits[6-regime_len] : ~expo[0];
+         Bit#(1) last_bit = assembled_mag[0];
+         Bit#(1) flag_equidistant = 0;
+         
+         if (flag_prev_truncate == 1'b1 && truncated_frac_zero == 1'b1 && last_bit == 1'b0) begin
+             flag_equidistant = 1'b1;
+         end
+         
+         UInt#(PositWidthMinus1) uint_mag = unpack(assembled_mag);
+         UInt#(PositWidthMinus1) rounded_mag = boundedPlus(uint_mag, extend(flag_prev_truncate));
+         rounded_mag = rounded_mag - extend(flag_equidistant);
+         
+         Bool rounding = (flag_prev_truncate - flag_equidistant == 1'b1 || rounded_mag == 0 && flag_equidistant == 0);
+
          let output_regf = Norm_Posit {
-             //carrying nan flag forward
              nan    : p.nan,
-             // depending on sign bit and zero_infinity_flag giving the final output
-             posit  : (p.zi == REGULAR) ? fv_outp_sign (pack (uint_k_expo_frac), p.sign)
+             posit  : (p.zi == REGULAR) ? fv_outp_sign (pack (rounded_mag), p.sign)
                                         : fv_outp_z_i (p.zi),
              zi     : p.zi,
              rounding : rounding

@@ -109,38 +109,67 @@ module mkExtracter #(Bit #(2) verbosity) (Server #(Posit, Posit_Extract));
          Bit#(PositWidthMinus1) new_inp = (sign == 0) ? new_inp1
                                                       : twos_complement(new_inp1);
 
-         // number of leading ones in new input
-         let lead_one_no = countZerosMSB (~(new_inp));
+         // B-Posit modifications:
+         // The regime is limited to a maximum length of 6 bits.
+         // Thus, we only compare new_inp[n_int-2] with the next 5 bits.
+         Bit#(1) rc = new_inp[n_int-2];
+         Bit#(5) regime_check_bits = new_inp[n_int-3 : n_int-7];
+         Bit#(5) xor_bits = regime_check_bits ^ signExtend(rc);
 
-         // number of leading zeros in new input
-         let lead_zero_no = countZerosMSB (new_inp);
-
-         // states if there is only regime field with leading bit 1 and no exponent & fraction field 
-         let one_full_regime = (lead_one_no == fromInteger(n_int-1)) ? 0 : 1; 
-
-         // states if there is only regime field with leading bit 0 and no exponent & fraction field 
-         let zero_full_regime = (lead_zero_no == fromInteger(n_int-1)) ? 0 : 1; 
+         // Priority encoder to find the first differing bit (which marks the end of the regime)
+         // pe_out is the number of matching bits after the first regime bit (0 to 5)
+         Bit#(3) pe_out;
+         if (xor_bits[4] == 1'b1) pe_out = 0;
+         else if (xor_bits[3] == 1'b1) pe_out = 1;
+         else if (xor_bits[2] == 1'b1) pe_out = 2;
+         else if (xor_bits[1] == 1'b1) pe_out = 3;
+         else if (xor_bits[0] == 1'b1) pe_out = 4;
+         else pe_out = 5; // Regime is max 6 bits, so no terminating bit is checked beyond this
 
          // k gives the value of regime field
-         // k is got depending on the leading bit, if one then (#zeros) -1 else -(#zeros)   
-         Int #(RegimeWidth) k = (msb(new_inp) == 1'b1) ? unpack (extend (pack (lead_one_no))-1)
-                                                       : unpack (twos_complement (extend (pack (lead_zero_no))));
+         Int#(RegimeWidth) k = (rc == 1'b1) ? unpack(extend(pe_out)) 
+                                            : unpack(twos_complement(extend(pe_out + 1)));
 
-         // iteration gives the value from which the exponent field starts
-         // iteration = N - 1(sign) - #leading bits -1(end of regime field if u have exponent & fraction field)
-         UInt #(Iteration) iteration = (msb(new_inp) == 1'b1) ? (fromInteger (n_int - 1 - one_full_regime) - (lead_one_no))
-                                                              : (fromInteger (n_int - 1 - zero_full_regime) - (lead_zero_no));
+         // MUX to extract exponent and fraction bits together
+         // Since regime length is 1 + pe_out, and there is an opposite bit (except when pe_out == 5 where there might not be),
+         // the exponent starts at n_int - 2 - regime_length, wait:
+         // For pe_out == 0 (length 1), exp starts at n_int - 4
+         // For pe_out == 1 (length 2), exp starts at n_int - 5
+         // For pe_out == 2 (length 3), exp starts at n_int - 6
+         // For pe_out == 3 (length 4), exp starts at n_int - 7
+         // For pe_out == 4 (length 5), exp starts at n_int - 8
+         // For pe_out == 5 (length 6), exp starts at n_int - 8 (Because there is no opposite bit! Wait!)
+         
+         // Let's verify B-Posit regime termination:
+         // "the b-posit restricts the regime field to a 6-bit limit"
+         // If pe_out == 5, the 6 bits are used for regime. The VERY NEXT bit is the exponent.
+         // So if pe_out == 5, regime is at [n_int-2 : n_int-7]. Exponent starts at n_int-8!
+         // Wait, if pe_out == 4, regime is at [n_int-2 : n_int-6], opposite bit at n_int-7. Exponent starts at n_int-8!
+         // This means for both pe_out == 4 and pe_out == 5, the exponent starts at n_int-8.
+         
+         // Let's create the unshifted remaining bits
+         Bit#(PositWidthMinus3) remaining_bits_0 = truncate(new_inp); // bits [n_int-4 : 0]
+         Bit#(PositWidthMinus3) remaining_bits_1 = {new_inp[n_int-5:0], 1'b0};
+         Bit#(PositWidthMinus3) remaining_bits_2 = {new_inp[n_int-6:0], 2'b0};
+         Bit#(PositWidthMinus3) remaining_bits_3 = {new_inp[n_int-7:0], 3'b0};
+         Bit#(PositWidthMinus3) remaining_bits_4 = {new_inp[n_int-8:0], 4'b0};
+         Bit#(PositWidthMinus3) remaining_bits_5 = {new_inp[n_int-8:0], 4'b0}; // same shift as pe_out==4
+         
+         Bit#(PositWidthMinus3) remaining_bits_shifted = 0;
+         case (pe_out)
+             0: remaining_bits_shifted = remaining_bits_0;
+             1: remaining_bits_shifted = remaining_bits_1;
+             2: remaining_bits_shifted = remaining_bits_2;
+             3: remaining_bits_shifted = remaining_bits_3;
+             4: remaining_bits_shifted = remaining_bits_4;
+             5: remaining_bits_shifted = remaining_bits_5;
+         endcase
 
-         // Case for (es = 5)
-         // if we have more than 4 bits available we have to shift the window for
-         // the exponent field else the windows position is fixed at last and
-         // the number of bits in exponent is decided using 5 bit mask
-         // depending on the number of bits available
-         Bit #(ExpWidth) expo = (iteration >= fromInteger(es_int)) ? new_inp [(iteration-1):(iteration-fromInteger(es_int))]
-                                                                   : (truncate(new_inp) << (fromInteger(es_int) - iteration));
-
-         // the frac size bit mask is decided on the number of bits available for fraction field
-         Bit #(FracWidth) frac = (truncate(new_inp) << fv_frac_shift(iteration));       
+         // Exponent is the first es_int bits of remaining_bits_shifted
+         Bit#(ExpWidth) expo = remaining_bits_shifted[valueOf(PositWidthMinus3)-1 : valueOf(PositWidthMinus3)-es_int];
+         
+         // Fraction is the rest
+         Bit#(FracWidth) frac = truncate(remaining_bits_shifted << es_int);
 
          let output_regf = Posit_Extract {
             ziflag : zi,
