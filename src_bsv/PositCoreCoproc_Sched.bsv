@@ -204,7 +204,7 @@ module mkPositCore_accel_sched #(Bit #(4) verbosity) (PositCore_IFC_accel);
 			ff_mul_Out.deq;
 			end
 		if (verbosity > 1)
-                   $display ("%0d: %m: rl_quire_compute: ", cur_cycle,"Quire value : ",rg_quire);
+                   $display ("%m: rl_quire_compute: ","Quire value : ",rg_quire);
 
 //		else if (tpl_2(ff_mul_Out.first) == FMS_P)
 //			begin
@@ -250,7 +250,7 @@ module mkPositCore_accel_sched #(Bit #(4) verbosity) (PositCore_IFC_accel);
 		ffI.deq;
 		//opcode_qtop.enq(op);
 		if (verbosity > 1)
-                   $display ("%0d: %m: rl_rdq: ", cur_cycle);
+                   $display ("%m: rl_rdq: ");
 	endrule
 	//------------------------------------------------------------------------------------------------
 /*
@@ -264,7 +264,7 @@ module mkPositCore_accel_sched #(Bit #(4) verbosity) (PositCore_IFC_accel);
 		ffI.deq;
 		opcode_qtop.enq(op);
 		if (verbosity > 1)
-                   $display ("%0d: %m: rl_rdq: ", cur_cycle);
+                   $display ("%m: rl_rdq: ");
 	endrule
 	//------------------------------------------------------------------------------------------------
 	// qtop --> norm //enq opcode_qtop_norm // deq opcode_qtop //
@@ -286,7 +286,7 @@ module mkPositCore_accel_sched #(Bit #(4) verbosity) (PositCore_IFC_accel);
 		opcode_qtop.deq;
 
                 if (verbosity > 1)
-                   $display ("%0d: %m: rl_qtop: ", cur_cycle);
+                   $display ("%m: rl_qtop: ");
 	endrule
     //------------------------------------------------------------------------------------------------------------
 	// norm --> ext //enq opcode_ptof // deq opcode_qtop_norm //
@@ -298,7 +298,7 @@ module mkPositCore_accel_sched #(Bit #(4) verbosity) (PositCore_IFC_accel);
 		opcode_qtop_norm.deq;
 		opcode_qtop_ext.enq(RD_Q);
                 if (verbosity > 1)
-                   $display ("%0d: %m: rl_qtop_norm: ", cur_cycle);
+                   $display ("%m: rl_qtop_norm: ");
 	endrule
 
 	//--------------------------------------------------------------------------------------------------
@@ -326,7 +326,7 @@ module mkPositCore_accel_sched #(Bit #(4) verbosity) (PositCore_IFC_accel);
 		ffO.enq(tuple2(out_ffO, valid_bit));
 		opcode_ptof.deq;
                 if (verbosity > 1)
-                   $display ("%0d: %m: rl_ptof_out: ", cur_cycle);
+                   $display ("%m: rl_ptof_out: ");
 	endrule
 	//----------------------------------------------------------------------------------------------------
 */

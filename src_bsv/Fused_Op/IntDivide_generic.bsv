@@ -52,7 +52,7 @@ module mkIntDivide #(Bit #(2) verbosity) (IntDivide_IFC);
          Bit #(1) trunc_frac_zero = pack((rem_truncate<<1) == 0);
          ffo.enq (tuple3 (quo, trunc_frac_msb, trunc_frac_zero));
          if (verbosity > 1) begin
-            $display ("%0d: %m: rl_loop2", cur_cycle);
+            $display ("%m: rl_loop2");
          end
       end
 
@@ -67,7 +67,7 @@ module mkIntDivide #(Bit #(2) verbosity) (IntDivide_IFC);
       end
 
       if (verbosity > 1) begin
-         $display ("%0d: %m: rl_loop2 ", cur_cycle);
+         $display ("%m: rl_loop2 ");
          $display ("   rg_numer %b",rg_numer);
          $display ("   rg_denom %b",rg_denom);
          $display ("   rg_quo %h",rg_quo);
@@ -87,7 +87,7 @@ module mkIntDivide #(Bit #(2) verbosity) (IntDivide_IFC);
             ffo.enq (tuple3 (rg_quo, trunc_frac_msb, trunc_frac_zero));
             
             if (verbosity > 1) begin
-               $display ("%0d: %m: request: ", cur_cycle);
+               $display ("%m: request: ");
                $display ("   Divide by zero ");
             end
          end
@@ -101,7 +101,7 @@ module mkIntDivide #(Bit #(2) verbosity) (IntDivide_IFC);
             rg_state    <= Div_LOOP1;
 
             if (verbosity > 1) begin
-               $display ("%0d: %m: request: ", cur_cycle);
+               $display ("%m: request: ");
                $display ("   rg_numer %b",rg_numer);
                $display ("   rg_denom %b",rg_denom);
                $display ("   rg_quo %h",rg_quo);

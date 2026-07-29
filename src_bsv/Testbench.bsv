@@ -23,7 +23,7 @@ module mkTestbench (Empty);
       let inp_posit = tuple4(in1,in2,round_mode,opcodes);
       pc.server_core.request.put (inp_posit);
       rg_state <= rg_state + 1;
-      $display("%0d: %m.rl_nb_req ", cur_cycle);
+      $display("%m.rl_nb_req ");
       $display("   in1 %h in2 %h opcode %b"
          , tpl_1(inp_posit).P, tpl_2(inp_posit).P, tpl_4(inp_posit));
    endrule
@@ -37,7 +37,7 @@ module mkTestbench (Empty);
       let inp_posit = tuple4(in1,in2,round_mode,opcodes);
       pc.server_core.request.put (inp_posit);
       rg_state <= rg_state + 1;
-      $display("%0d: %m.rl_read_out: ", cur_cycle);
+      $display("%m.rl_read_out: ");
       $display("   in1 %h in2 %h opcode %b"
          , tpl_1(inp_posit).P, tpl_2(inp_posit).P, tpl_4(inp_posit));
    endrule
@@ -45,7 +45,7 @@ module mkTestbench (Empty);
    // Catch the response for the FCVT_P_R
    rule rl_rsp;
       let z <- pc.server_core.response.get ();
-      $display("%0d: %m.rl_rsp: out %h exception %b",cur_cycle,tpl_1(z).P,tpl_2(z));
+      $display("%m.rl_rsp: out %h exception %b",tpl_1(z).P,tpl_2(z));
 
       $finish;  // this is the second and last response
    endrule

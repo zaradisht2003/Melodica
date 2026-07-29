@@ -1,0 +1,44 @@
+# =============================================================================
+# Melodica Design — Synthesis + Critical Path via ABC+ (Liberty-based STA)
+# =============================================================================
+# Top module: mkPositCore (Melodica posit arithmetic core)
+# Method:     Yosys synth → dfflibmap → abc -liberty (Liberty .lib)
+#             ABC SCL engine: read_lib → map → buffer → stime -p
+# Library:    generic45nm_fixed.lib (45nm standard cell, Liberty format)
+# =============================================================================
+
+# --- Step 1: Read BSC Verilog Primitives ---
+read_verilog -I /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog/FIFO1.v
+read_verilog -I /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog/FIFO2.v
+read_verilog -I /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog/SizedFIFO.v
+read_verilog -I /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog/RegFile.v
+
+# --- Step 2: Read Melodica Design Verilog Files ---
+read_verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/Learn_Bluespec_and_RISCV_Design/Code/Build/Fife/verilog/module_fn_twosC_quire.v
+read_verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/Learn_Bluespec_and_RISCV_Design/Code/Build/Fife/verilog/mkQuire.v
+read_verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/Learn_Bluespec_and_RISCV_Design/Code/Build/Fife/verilog/mkMultiplier.v
+read_verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/Melodica/src_bsv/build/mkNormalizer.v
+read_verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/Melodica/src_bsv/build/mkExtracter.v
+read_verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/Learn_Bluespec_and_RISCV_Design/Code/Build/Fife/verilog/mkFtoP_PNE.v
+read_verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/Learn_Bluespec_and_RISCV_Design/Code/Build/Fife/verilog/mkPtoF_PNE.v
+read_verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/Learn_Bluespec_and_RISCV_Design/Code/Build/Fife/verilog/mkPositCore.v
+
+# --- Step 3: Elaborate and Flatten ---
+hierarchy -check -top mkPositCore
+synth -top mkPositCore -flatten
+
+# --- Step 4: Map FFs to Liberty DFF cells ---
+dfflibmap -liberty /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/generic45nm_fixed.lib
+
+# --- Step 5: ABC+ Technology Mapping using Liberty-based timing ---
+# This uses the Liberty .lib file directly for timing-driven mapping
+# The ABC SCL engine reads the .lib, performs AIG optimization (dch),
+# technology mapping (map), buffer insertion (buffer), and then
+# runs full STA with critical path trace (stime -p)
+abc -liberty /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/generic45nm_fixed.lib -script "+read_lib,/teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/generic45nm_fixed.lib;strash;dch;map;topo;buffer;upsize;dnsize;stime -p;print_stats -t"
+
+# --- Step 6: Post-mapping statistics ---
+stat -liberty /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/generic45nm_fixed.lib
+
+# --- Step 7: Write mapped netlist for reference ---
+write_verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/Melodica/melodica_abc_plus_mapped.v

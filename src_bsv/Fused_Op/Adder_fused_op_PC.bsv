@@ -106,7 +106,7 @@ module mkAdder #(Bit #(2) verbosity) (Server #(Quire_Acc, Bit #(0)));
          fifo_stage0_reg.enq(stage0_regf);
 
          if (verbosity > 1) begin
-            $display ("%0d: %m: request: ", cur_cycle);
+            $display ("%m: request: ");
             $display ("   dIn.q1.sign %b dIn.q1.carry_int_frac %b",dIn.q1.sign,dIn.q1.carry_int_frac);
             $display ("   dIn.quire_md %b",dIn.quire_md);
          end

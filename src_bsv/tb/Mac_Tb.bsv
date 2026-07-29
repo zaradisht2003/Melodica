@@ -143,7 +143,7 @@ rule rlGenerate (!rgGenComplete && doneSet);
    let inPosit22 = lfsr2.value();
    let inPosit33 = lfsr3.value();
    //*/
-$display("[%0d]Input tb",cur_cycle);
+$display("[%0d]Input tb");
    dut.compute.request.put (InputThreePosit{posit_inp1 : truncate (inPosit11),posit_inp2 : truncate (inPosit22), posit_inp3 : truncate (inPosit33)});
 
    // Bookkeeping
@@ -210,7 +210,7 @@ rule rlCheck (!rgChkComplete && doneSet );
 	 wrongOut <= wrongOut+1;
          
       end
-      $display("[%0d]Output tb",cur_cycle);
+      $display("[%0d]Output tb");
          rgCurOutput <= rgCurOutput + 1;
 		//$display("rgCurOutput %b",rgCurOutput);
          // Completion condition

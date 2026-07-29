@@ -100,7 +100,7 @@ module mkPtoF_PNE #(Bit #(2) verbosity) (Server #(Posit_Extract, Float_Extract))
                                                             : (float_no+extend(add_round)) ;
 
       if (verbosity > 1) begin
-         $display ("%0d: %m: request.fa_extract_float: ", cur_cycle);
+         $display ("%m: request.fa_extract_float: ");
          $display ("   scale_f %b scale_plus_bias %b frac_f %b"
             , scale_f, scale_plus_bias, frac_f);
          $display ("   float_no %b add_round %b ", float_no, add_round);
@@ -139,7 +139,7 @@ module mkPtoF_PNE #(Bit #(2) verbosity) (Server #(Posit_Extract, Float_Extract))
             frac_zero :frac_zero};
          fa_extract_float (stage0_regf);
          if (verbosity > 1) begin
-            $display ("%0d: %m: request: ", cur_cycle);
+            $display ("%m.request_stg1: 0x%08x", p);
             $display ("   Inputs: sign %b scale %b frac %b"
                ,p.sign, p.scale, p.frac);
             $display ("   Adjusted: frac %b scale %b frac_change %b"

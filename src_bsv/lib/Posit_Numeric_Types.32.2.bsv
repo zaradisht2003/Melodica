@@ -48,11 +48,11 @@ typedef         1   BitsPerExpWidth               ;    // log2 (ExpWidth)
 
 typedef        27   FracWidth                     ;    // PositWidth-3-ExpWidth
 
-typedef         7   ScaleWidth                    ;    // log2((PositWidth-1)*(2^ExpWidth)-1)
-typedef         8   ScaleWidthPlus1               ;    // ScaleWidth + 1
+typedef         9   ScaleWidth                    ;    // log2((PositWidth-1)*(2^ExpWidth)-1)
+typedef        10   ScaleWidthPlus1               ;    // ScaleWidth + 1
 typedef        26   FracWidthMinus1               ;    // FracWidth - 1
-typedef         5   ScaleWidthMinusExpWidth       ;    // ScaleWidth - ExpWidth
-typedef         6   ScaleWidthMinusExpWidthPlus1  ;    // ScaleWidth - ExpWidth
+typedef         7   ScaleWidthMinusExpWidth       ;    // ScaleWidth - ExpWidth
+typedef         8   ScaleWidthMinusExpWidthPlus1  ;    // ScaleWidth - ExpWidth
 typedef        22   FloatFracWidthMinus1          ;    // (FloatFracWidth-1)
 typedef         4   FracWidthMinusFloatFracWidth  ;    // (FracWidth-FloatFracWidth)
 typedef         6   LogFracWidthPlus1             ;    // log2 (FracWidth) + 1

@@ -383,7 +383,7 @@ module mkQuire #(Bit #(2) verbosity) (Quire_IFC);
                           && (rg_seg_zero_upd)
                           && (!seg_adder.busy)
                          );
-      if (verbosity > 1) $display ("%0d: %m.rl_read_response", cur_cycle);
+      if (verbosity > 1) $display ("%m.rl_read_response");
 
       let msbZeros = ff_num_msb_zeros.first; ff_num_msb_zeros.deq;
 
@@ -540,7 +540,7 @@ module mkQuire #(Bit #(2) verbosity) (Quire_IFC);
       rg_seg_zero_upd <= True;
 
       if (verbosity > 1) begin
-         $display ("%0d: %m: init: ", cur_cycle);
+         $display ("%m: init: ");
          if (verbosity > 2) begin
             $display ("    qif: 0x%0h", qif);
             $display ("    v_quire_seg_zero: ", fshow (v_quire_seg_zero));
@@ -556,7 +556,7 @@ module mkQuire #(Bit #(2) verbosity) (Quire_IFC);
                               && (rg_seg_zero_upd));
 
       if (verbosity > 1)
-         $display ("%0d: %m: read_req: ", cur_cycle);
+         $display ("%m: read_req: ");
 
       // Special cases -- zero quire
       if (quire_is_zero) begin

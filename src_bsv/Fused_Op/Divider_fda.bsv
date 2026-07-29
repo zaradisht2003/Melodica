@@ -112,7 +112,7 @@ module mkDivider #(Bit #(2) verbosity) (
       ff_to_quire.enq (quire_in);
 
       if (verbosity > 1) begin
-         $display ("%0d: %m.stage_1: ", cur_cycle);
+         $display ("%m.stage_1: ");
          if (verbosity > 2) begin
             $display ("   frac_msb  : %0b", quire_in.frac_msb);
             $display ("   frac_zero : %0b", quire_in.frac_zero);
@@ -164,7 +164,7 @@ module mkDivider #(Bit #(2) verbosity) (
          ff_pipe_reg.enq (stage0_regf);
 
          if (verbosity > 1) begin
-            $display ("%0d: %m.request: ", cur_cycle);
+            $display ("%m.request: ");
             if (verbosity > 2) 
                $display ("   ", fshow (stage0_regf));
          end

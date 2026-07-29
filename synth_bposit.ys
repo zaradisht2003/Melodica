@@ -1,0 +1,32 @@
+# =============================================================================
+# B-Posit Extractor and Normalizer Synthesis
+# =============================================================================
+
+# --- Step 1: Read BSC Verilog Primitives ---
+read_verilog -I /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog/FIFO1.v
+read_verilog -I /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog/FIFO2.v
+read_verilog -I /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog/SizedFIFO.v
+
+# --- Step 2: Read Generated Verilog Files ---
+read_verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/Melodica/src_bsv/build/mkExtracter.v
+read_verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/Melodica/src_bsv/build/mkNormalizer.v
+
+# --- Step 3: Elaborate and Flatten Extracter ---
+hierarchy -check -top mkExtracter
+synth -top mkExtracter -flatten
+dfflibmap -liberty /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/generic45nm_fixed.lib
+abc -liberty /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/generic45nm_fixed.lib -script "+read_lib,/teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/generic45nm_fixed.lib;strash;dch;map;topo;buffer;upsize;dnsize;stime -p;print_stats -t"
+stat -liberty /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/generic45nm_fixed.lib
+
+# --- Step 4: Clean for Normalizer ---
+design -reset
+read_verilog -I /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog/FIFO1.v
+read_verilog -I /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog/FIFO2.v
+read_verilog -I /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/bsc/lib/Verilog/SizedFIFO.v
+read_verilog /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/Melodica/src_bsv/build/mkNormalizer.v
+
+hierarchy -check -top mkNormalizer
+synth -top mkNormalizer -flatten
+dfflibmap -liberty /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/generic45nm_fixed.lib
+abc -liberty /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/generic45nm_fixed.lib -script "+read_lib,/teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/generic45nm_fixed.lib;strash;dch;map;topo;buffer;upsize;dnsize;stime -p;print_stats -t"
+stat -liberty /teamspace/studios/this_studio/Melodica-Integration-into-Fife-Core/generic45nm_fixed.lib

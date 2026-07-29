@@ -116,7 +116,7 @@ module mkTb (Empty) ;
 		positCore_ftop1.server_core.request.put(tuple4(tagged S v_1a,reg_d,round_mode,FCVT_P_S));
 		positCore_ftop2.server_core.request.put(tuple4(tagged S v_2a,reg_d,round_mode,FCVT_P_S)); 
 		positCore_accel.server_core.request.put(tuple4(tagged S v_1a,tagged S v_2a,FMA_P,round_mode));
-		$display ("%0d: State: ", cur_cycle, fshow (state));
+		$display ("%0d: State: ", fshow (state));
 		state <= FTP;
 	endrule
 	//--------------------------------------------------------------------------------------------------------------	
@@ -127,7 +127,7 @@ module mkTb (Empty) ;
 		positCore_fma.server_core.request.put(tuple4(tpl_1(ftop_a),tpl_1(ftop_b),round_mode,FMA_P));
 //		positCore_accel.server_core.request.put(tuple4(reg1a_f,reg2a_f,FMA_P,round_mode));
 		state <= FMA;
-		$display ("%0d: State: ", cur_cycle,fshow(state)," ",fshow(ftop_a), " ", fshow(ftop_b));
+		$display ("%0d: State: ",fshow(state)," ",fshow(ftop_a), " ", fshow(ftop_b));
 	endrule
 	//--------------------------------------------------------------------------------------------------------------	
 	//rule initiating quire to posit
@@ -146,7 +146,7 @@ module mkTb (Empty) ;
 			end	
 
 
-		$display ("%0d: State: ", cur_cycle, fshow (state));
+		$display ("%0d: State: ", fshow (state));
 	endrule
 	//--------------------------------------------------------------------------------------------------------------	
 	// rule initiation posit to float
@@ -164,14 +164,14 @@ module mkTb (Empty) ;
 			//rg_PositCore_accel <= final_out;
 			$display(fshow(final_out));
 			end
-		$display ("%0d: State: ", cur_cycle, fshow (state));
+		$display ("%0d: State: ", fshow (state));
 	endrule
 	//--------------------------------------------------------------------------------------------------------------	
 	//rule for final output
 	rule rl_out (state == OUT && rgGenComplete);
 		let float_out <- positCore_ptof.server_core.response.get();
 		ffO_PositCore.enq(float_out);
-		$display ("%0d: State: ",cur_cycle, fshow(state),"OUT_PositCore", fshow(float_out));
+		$display ("%0d: State: ", fshow(state),"OUT_PositCore", fshow(float_out));
 		rgGenComplete <= False;		
 	endrule
 	//--------------------------------------------------------------------------------------------------------------	

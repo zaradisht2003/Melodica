@@ -194,7 +194,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
           || (cmd == FCVT_R_P)) rg_inflight <= rg_inflight + 1;
 
       if (verbosity > 1)
-         $display ("%0d: %m: rl_extract_stg1: ", cur_cycle, fshow (cmd));
+         $display ("%m: rl_extract_stg1: ", fshow (cmd));
    endrule
 
    // Stage 1: Initiate float to posit conversion
@@ -205,7 +205,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       ftop.request.put (f); 
       cmd_stg2_f.enq (cmd); ffI.deq;
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_float_to_posit_stg1: convert ", cur_cycle);
+         $display ("%m.rl_float_to_posit_stg1: convert ");
          if (verbosity > 2)
             $display ("   ", fshow (float_val));
       end
@@ -220,7 +220,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       ffI.deq;
 
       if (verbosity > 1)
-         $display ("%0d: %m.rl_read_quire_stg1: read ", cur_cycle);
+         $display ("%m.rl_read_quire_stg1: read ");
    endrule
 
    // Initiate a direct read of the quire where we do not
@@ -234,7 +234,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       ffI.deq;
 
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_direct_read_quire_stg1", cur_cycle);
+         $display ("%m.rl_direct_read_quire_stg1");
          if (verbosity > 2) begin
             $display ("     (Op1: ", fshow (op1), ") -> (Out: ", fshow (quire_out));
          end
@@ -249,7 +249,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       ffI.deq;
 
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_direct_write_quire_stg1: ", cur_cycle);
+         $display ("%m.rl_direct_write_quire_stg1: ");
          if (verbosity > 2) begin
             $display ("     (Op1: ", fshow (op1), ") (Op2: ", fshow (op2));
          end
@@ -275,7 +275,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       // ffO.enq(tuple2(posit_out, no_excep));
 
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_fma_stg2: multiply ", cur_cycle);
+         $display ("%m.rl_fma_stg2: multiply ");
          if (verbosity > 2) begin
             $display ("   ext_out1: ", fshow (ext_out1));
             $display ("   ext_out2: ", fshow (ext_out2));
@@ -294,7 +294,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       cmd_stg3_f.enq (cmd_stg2); cmd_stg2_f.deq;
 
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_fda_stg2: divide ", cur_cycle);
+         $display ("%m.rl_fda_stg2: divide ");
          if (verbosity > 2) begin
             $display ("   ext_out1: ", fshow (ext_out1));
             $display ("   ext_out2: ", fshow (ext_out2));
@@ -311,7 +311,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       ptof.request.put (ext_out1);
       cmd_stg3_f.enq (cmd_stg2); cmd_stg2_f.deq;
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_posit_to_float_stg2: convert ", cur_cycle);
+         $display ("%m.rl_posit_to_float_stg2: convert ");
          if (verbosity > 2)
             $display ("   ext_out1: ", fshow (ext_out1));
       end
@@ -324,7 +324,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       cmd_stg3_f.enq (cmd_stg2); cmd_stg2_f.deq;
 
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_float_to_posit_stg2: normalize ", cur_cycle);
+         $display ("%m.rl_float_to_posit_stg2: normalize ");
          if (verbosity > 2)
             $display ("   ftop out: ", fshow (o));
       end
@@ -344,7 +344,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       rg_inflight <= rg_inflight - 1;
 
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_init_quire_stg2: initialize ", cur_cycle);
+         $display ("%m.rl_init_quire_stg2: initialize ");
          if (verbosity > 2)
             $display ("   ext_out1: ", fshow (ext_out1));
       end
@@ -357,7 +357,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       cmd_stg3_f.enq (cmd_stg2); cmd_stg2_f.deq;
 
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_read_quire_stg2: normalize ", cur_cycle);
+         $display ("%m.rl_read_quire_stg2: normalize ");
          if (verbosity > 2)
             $display ("   qtop out: ", fshow (o));
       end
@@ -379,7 +379,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       rg_inflight <= rg_inflight - 1;
 
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_fma_stg3: accumulate ", cur_cycle);
+         $display ("%m.rl_fma_stg3: accumulate ");
          if (verbosity > 2)
             $display ("   mul out: ", fshow (quire_increment));
       end
@@ -398,7 +398,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       rg_inflight <= rg_inflight - 1;
 
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_fda_stg3: accumulate ", cur_cycle);
+         $display ("%m.rl_fda_stg3: accumulate ");
          if (verbosity > 2)
             $display ("   div out: ", fshow (quire_increment));
       end
@@ -427,7 +427,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       cmd_stg3_f.deq;
 
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_posit_to_float_stg3: out ", cur_cycle);
+         $display ("%m.rl_posit_to_float_stg3: out ");
          if (verbosity > 2) begin
             $display ("   float: ", fshow (fout));
             $display ("   exception: ", fshow (excep));
@@ -450,7 +450,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       cmd_stg3_f.deq;
 
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_float_to_posit_stg3: out ", cur_cycle);
+         $display ("%m.rl_float_to_posit_stg3: out ");
          if (verbosity > 2) begin
             $display ("   posit: ", fshow (posit_out));
             $display ("   exception: ", fshow (excep));
@@ -474,7 +474,7 @@ module mkPositCore #(Bit #(2) verbosity) (PositCore_IFC);
       cmd_stg3_f.deq;
 
       if (verbosity > 1) begin
-         $display ("%0d: %m.rl_read_quire_stg3: out ", cur_cycle);
+         $display ("%m.rl_read_quire_stg3: out ");
          if (verbosity > 2) begin
             $display ("   posit: ", fshow (out_pf));
             $display ("   exception: ", fshow (excep));

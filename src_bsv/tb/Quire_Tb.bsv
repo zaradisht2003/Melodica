@@ -257,7 +257,7 @@ function Action fa_report_test_pass;
 `ifdef FPGA
    noAction;
 `else
-   $display ("%0d: %m: ALL TEST PASS", cur_cycle);
+   $display ("%m: ALL TEST PASS");
    $finish;
 `endif
    endaction
@@ -267,7 +267,7 @@ function Action fa_report_test_fail (Bit #(PositWidth) test_num);
    action
    rg_error <= True;
 `ifndef FPGA
-   $display ("%0d: %m: TEST FAILURE: %0d", cur_cycle, test_num);
+   $display ("%m: TEST FAILURE: %0d", test_num);
    $finish;
 `endif
    endaction
@@ -301,7 +301,7 @@ rule rl_tst_ext ((rg_tb_state == TST) && (rg_comp_state == EXT));
    posit_in_f.enq (inPosit);
 
    if (verbosity > 0) begin
-      $display ("%0d: %m.rl_tst_ext: Test %d ", cur_cycle, (rg_ip_num+1));
+      $display ("%m.rl_tst_ext: Test %d ", (rg_ip_num+1));
       if (verbosity > 1)
          $display ("   inPosit: 0x%08h", inPosit);
    end
@@ -312,7 +312,7 @@ rule rl_tst_init ((rg_tb_state == TST) && (rg_comp_state == INIT));
    quire.init (ext_out);
    rg_comp_state <= READREQ;
    if (verbosity > 0) begin
-      $display ("%0d: %m.rl_tst_init: Test %d ", cur_cycle, rg_ip_num);
+      $display ("%m.rl_tst_init: Test %d ", rg_ip_num);
       if (verbosity > 1)
          $display ("   ext_out1: ", fshow (ext_out));
    end
@@ -323,7 +323,7 @@ rule rl_tst_readreq ((rg_tb_state == TST) && (rg_comp_state == READREQ));
    rg_comp_state <= READRSP;
 
    if (verbosity > 0) begin
-      $display ("%0d: %m.rl_tst_readreq: Test %d ", cur_cycle, rg_ip_num);
+      $display ("%m.rl_tst_readreq: Test %d ", rg_ip_num);
    end
 endrule
 
@@ -333,7 +333,7 @@ rule rl_tst_readrsp ((rg_tb_state == TST) && (rg_comp_state == READRSP));
    rg_comp_state <= NORM;
 
    if (verbosity > 0) begin
-      $display ("%0d: %m.rl_tst_readrsp: Test %d ", cur_cycle, rg_ip_num);
+      $display ("%m.rl_tst_readrsp: Test %d ", rg_ip_num);
       if (verbosity > 1)
          $display ("   quire out: ", fshow (o));
    end
@@ -355,7 +355,7 @@ rule rl_tst_norm ((rg_tb_state == TST) && (rg_comp_state == NORM));
 `endif
 
    if (verbosity > 0) begin
-      $display ("%0d: %m.rl_tst_norm: Test %d ", cur_cycle, rg_ip_num);
+      $display ("%m.rl_tst_norm: Test %d ", rg_ip_num);
       if (verbosity > 1) begin
          $display ("   norm_out: ", fshow (norm_out));
          $display ("   posit_in: ", fshow (posit_in));
