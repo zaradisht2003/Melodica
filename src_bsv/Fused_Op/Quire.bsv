@@ -124,15 +124,18 @@ function Tuple2 #(Bool, Int #(ScaleWidthPlus1)) fn_bound_scale (
    , Int #(ScaleWidthPlus1) maxB
    , Int #(ScaleWidthPlus1) minB
 );
-   Int#(ScaleWidthPlus1) scale0 = truncate (scale);
+   Int#(100) scale_wide = signExtend(scale);
+   Int#(ScaleWidthPlus1) scale0 = truncate(scale_wide);
+   Int#(100) minB_wide = signExtend(minB);
+   Int#(100) maxB_wide = signExtend(maxB);
    Bool bounded = True;
    // frac_change gives the number of bits that are more or less than scale bounds
    // so that we can shift the frac bits to not lose scale information 
-   if (scale < signExtend(minB)) begin
+   if (scale_wide < minB_wide) begin
       scale0 = minB; // min bound scale
       bounded = False;
    end
-   else if (scale > signExtend(maxB)) begin
+   else if (scale_wide > maxB_wide) begin
       scale0 = maxB; // max bound scale
       bounded = False;
    end
@@ -185,7 +188,10 @@ module mkSegZeroCounter #(
 `ifdef PWIDTH_8
       rg_firstNonZeroSeg <= v_longData [0];
 `else
-      let v_segIsZero = readVReg (vrg_quire_seg_zero);
+      Vector#(N_Segs, Bit#(1)) v_segIsZero = newVector();
+      for (Integer i = 0; i < valueOf(N_Segs); i = i + 1) begin
+         v_segIsZero[i] = pack(v_longData[i] == 0);
+      end
       Bit #(N_Segs) segIsZero = pack (v_segIsZero);
 
       // Count the number of leading segments which are 0s
@@ -487,14 +493,16 @@ module mkQuire #(Bit #(2) verbosity) (Quire_IFC);
       // No need for addition, the input quire becomes the quire value
       
       // b: the input is zero, no need for additon, this input can be skipped.
+      if (verbosity > 2) $display("Quire accumulate: input_is_zero=%b quire_is_zero=%b v_quire_seg_zero=%b", input_is_zero, quire_is_zero, pack(v_quire_seg_zero));
 
       if (!input_is_zero) begin
          if (!seg_adder.busy) begin
             if (quire_is_zero) begin
                // Special Case (a)
                Vector #(N_Segs, Segment) v_quire_in = unpack (quire_in);
+               Vector #(N_Segs, Bit#(1)) v_quire_in_seg_zero = map (fn_seg_is_zero, v_quire_in);
                writeVReg (vrg_quire, v_quire_in);
-               writeVReg (vrg_quire_seg_zero, v_quire_seg_zero);
+               writeVReg (vrg_quire_seg_zero, v_quire_in_seg_zero);
                rg_seg_zero_upd <= True;
             end
 

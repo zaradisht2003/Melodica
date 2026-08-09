@@ -37,7 +37,7 @@ module mkNormalizer #(Bit #(2) verbosity) (Server #(Prenorm_Posit, Norm_Posit));
 
    interface Put request;
       method Action put (Prenorm_Posit p);
-         // B-Posit Encoder Logic (rS = 6, eS = 4)
+         // B-Posit Encoder Logic (rS = 6, eS = 5)
          Int#(ScaleWidthPlus1) s_val = unpack(p.scale);
          Int#(4) k_int = truncate(s_val >> valueOf(ExpWidth));
          Bit#(4) k_val = pack(k_int);
@@ -63,19 +63,19 @@ module mkNormalizer #(Bit #(2) verbosity) (Server #(Prenorm_Posit, Norm_Posit));
          // Apply sign XOR to regime
          Bit#(6) final_reg = raw_reg ^ signExtend(p.sign);
 
-         // Exponent is XORed with sign (4 bits for eS=4)
-         Bit#(4) raw_exp = p.scale[3:0] ^ signExtend(p.sign);
+         // Exponent is XORed with sign (5 bits for eS=5)
+         Bit#(5) raw_exp = p.scale[4:0] ^ signExtend(p.sign);
 
-         // Significand (raw_frac) is 25 bits for eS=4, N=32
-         Bit#(25) sig_bits = p.frac[24:0];
+         // Significand (raw_frac) is 24 bits for eS=5, N=32
+         Bit#(24) sig_bits = p.frac[23:0];
 
          // MUX for packing (31 bits)
          Bit#(31) packed_val = 0;
-         if (reg_sz == 2) packed_val = {final_reg[1:0], raw_exp, sig_bits[24:0]};
-         else if (reg_sz == 3) packed_val = {final_reg[2:0], raw_exp, sig_bits[24:1]};
-         else if (reg_sz == 4) packed_val = {final_reg[3:0], raw_exp, sig_bits[24:2]};
-         else if (reg_sz == 5) packed_val = {final_reg[4:0], raw_exp, sig_bits[24:3]};
-         else packed_val = {final_reg[5:0], raw_exp, sig_bits[24:4]};
+         if (reg_sz == 2) packed_val = {final_reg[1:0], raw_exp, sig_bits[23:0]};
+         else if (reg_sz == 3) packed_val = {final_reg[2:0], raw_exp, sig_bits[23:1]};
+         else if (reg_sz == 4) packed_val = {final_reg[3:0], raw_exp, sig_bits[23:2]};
+         else if (reg_sz == 5) packed_val = {final_reg[4:0], raw_exp, sig_bits[23:3]};
+         else packed_val = {final_reg[5:0], raw_exp, sig_bits[23:4]};
 
          Bit#(32) final_posit = {p.sign, packed_val};
 
