@@ -67,12 +67,12 @@ module mkExtracter #(Bit #(2) verbosity) (Server #(Posit, Posit_Extract));
          else if (one_hot_sel[1] == 1) exp_sig_out = {p[n_int-7 : 0], 3'b000};
          else if (one_hot_sel[0] == 1) exp_sig_out = {p[n_int-8 : 0], 4'b0000};
 
-         // Extract Exponent (3 bits for eS=3) and Fraction (26 bits for N=32, eS=3)
-         Bit#(3) raw_exp = exp_sig_out[n_int-4 : n_int-6];
-         Bit#(FracWidth) raw_frac = exp_sig_out[n_int-7 : 0];
+         // Extract Exponent (4 bits for eS=4) and Fraction (25 bits for N=32, eS=4)
+         Bit#(4) raw_exp = exp_sig_out[n_int-4 : n_int-7];
+         Bit#(FracWidth) raw_frac = exp_sig_out[n_int-8 : 0];
 
          // Process Exponent
-         Bit#(3) exp = raw_exp ^ signExtend(sign);
+         Bit#(4) exp = raw_exp ^ signExtend(sign);
          Bit#(1) exp_cin = (sign == 1 && raw_frac == 0) ? 1 : 0;
 
          let output_regf = Posit_Extract {
