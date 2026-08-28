@@ -124,16 +124,17 @@ function Tuple2 #(Bool, Int #(ScaleWidthPlus1)) fn_bound_scale (
    , Int #(ScaleWidthPlus1) maxB
    , Int #(ScaleWidthPlus1) minB
 );
-   Int#(ScaleWidthPlus1) scale0 = truncate (scale);
+   Int#(100) scale_wide = signExtend(scale);
+   Int#(100) minB_wide  = signExtend(minB);
+   Int#(100) maxB_wide  = signExtend(maxB);
+   Int#(ScaleWidthPlus1) scale0 = truncate (scale_wide);
    Bool bounded = True;
-   // frac_change gives the number of bits that are more or less than scale bounds
-   // so that we can shift the frac bits to not lose scale information 
-   if (scale < signExtend(minB)) begin
-      scale0 = minB; // min bound scale
+   if (scale_wide < minB_wide) begin
+      scale0 = minB;
       bounded = False;
    end
-   else if (scale > signExtend(maxB)) begin
-      scale0 = maxB; // max bound scale
+   else if (scale_wide > maxB_wide) begin
+      scale0 = maxB;
       bounded = False;
    end
    return (tuple2 (bounded, scale0));

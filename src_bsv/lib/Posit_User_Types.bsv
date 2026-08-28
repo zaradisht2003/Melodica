@@ -46,7 +46,7 @@ import Posit_Numeric_Types :: *;
    typedef TAdd#(LogFracWidthMul4,1)               LogFracWidthMul4Plus1   ;//logFW4+1   
 
    //FDP
-   typedef TDiv#(TMul#(PositWidth,PositWidth),2)            QuireWidth;//QW = (PW^2)/2
+   typedef TAdd#(TMul#(24, TExp#(ExpWidth)), 32) QuireWidth;//QW = (PW^2)/2
    typedef TSub#(QuireWidth,2)                  QuireWidthMinus2;//QW-2
    typedef TDiv#(QuireWidth,2)                  QuireWidthBy2;//QW/2
    typedef TDiv#(PositWidth,2)                  PositWidthBy2;//PW/2

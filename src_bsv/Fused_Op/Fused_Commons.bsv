@@ -113,14 +113,18 @@ function Tuple4 #(
    if (s >= 0) begin // strictly > is sufficient, but >= infers simpler logic
       Bit #(IntFracWidthQ) shftamt = extend (pack (s));
       q_if = q_if << shftamt;
-      leading_one = leading_one - truncate (pack (s));
+      Bit #(100) s_bwide = zeroExtend(pack(s));
+      Bit #(LogQuireWidth) s_log = truncate(s_bwide);
+      leading_one = leading_one - s_log;
    end 
 
    else begin
       s = abs(s);
       Bit #(IntFracWidthQ) shftamt = extend (pack (s));
       q_if = q_if >> shftamt;
-      leading_one = leading_one + truncate (pack (s));
+      Bit #(100) s_bwide = zeroExtend(pack(s));
+      Bit #(LogQuireWidth) s_log = truncate(s_bwide);
+      leading_one = leading_one + s_log;
    end
 
    // Include the carry, which is all zeros
@@ -153,10 +157,14 @@ function Tuple4 #(
 
    // frac_shift = FWQ-(FW*2 or (no_of_frac_bits_input - 2)) + scale(signed sum)
    // if input scale is negative beyond and extent s.t fracshift < 0
-   Int #(TAdd #(LogCarryWidthPlusIntWidthPlusFracWidthQ,1)) scale_neg_temp = truncate(abs(s)) - fromInteger(valueOf(FracWidthQ));//scale_neg_temp = abs(s)-FWQ
+   Int #(100) abs_s_wide = signExtend(abs(s));
+   Int #(TAdd #(LogCarryWidthPlusIntWidthPlusFracWidthQ,1)) s_neg_ext = truncate(abs_s_wide);
+   Int #(TAdd #(LogCarryWidthPlusIntWidthPlusFracWidthQ,1)) scale_neg_temp = s_neg_ext - fromInteger(valueOf(FracWidthQ));//scale_neg_temp = abs(s)-FWQ
    Int #(LogCarryWidthPlusIntWidthPlusFracWidthQ) scale_neg = truncate(scale_neg_temp + fromInteger(frac_width));//frac_shift = scale_neg = abs(s) - (FWQ-(FW*2 or (no_of_frac_bits_input - 2)))
    // if input scale is negative beyond and extent s.t fracshift > 0
-   Int #(TAdd#(LogCarryWidthPlusIntWidthPlusFracWidthQ,1)) scale_pos = truncate(s) + fromInteger(valueOf(FracWidthQ)-frac_width);// frac_shift = scale_pos = s + FWQ-(FW*2 or (no_of_frac_bits_input - 2))
+   Int #(100) s_wide = signExtend(s);
+   Int #(TAdd#(LogCarryWidthPlusIntWidthPlusFracWidthQ,1)) s_pos_ext = truncate(s_wide);
+   Int #(TAdd#(LogCarryWidthPlusIntWidthPlusFracWidthQ,1)) scale_pos = s_pos_ext + fromInteger(valueOf(FracWidthQ)-frac_width);// frac_shift = scale_pos = s + FWQ-(FW*2 or (no_of_frac_bits_input - 2))
    Bit #(1) truncated_frac_msb = truncated_frac_msb_in;
    Bit #(1) truncated_frac_zero = ~truncated_frac_msb_in & truncated_frac_zero_in;
    Bit #(CarryWidthQ) carry = '0;
