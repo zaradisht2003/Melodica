@@ -37,45 +37,54 @@ module mkNormalizer #(Bit #(2) verbosity) (Server #(Prenorm_Posit, Norm_Posit));
 
    interface Put request;
       method Action put (Prenorm_Posit p);
-         // B-Posit Encoder Logic (rS = 6, eS = 5)
+         // B-Posit Encoder Logic (rS = 11, eS = 4)
          Int#(ScaleWidthPlus1) s_val = unpack(p.scale);
          Int#(4) k_int = truncate(s_val >> valueOf(ExpWidth));
          Bit#(4) k_val = pack(k_int);
-         Bit#(6) raw_reg = 0;
-         Bit#(3) reg_sz = 0;
+         Bit#(11) raw_reg = 0;
+         Bit#(4) reg_sz = 0;
 
          case (k_val)
-             4'b0000: begin raw_reg = 6'b000010; reg_sz = 2; end // k=0
-             4'b0001: begin raw_reg = 6'b000110; reg_sz = 3; end // k=1
-             4'b0010: begin raw_reg = 6'b001110; reg_sz = 4; end // k=2
-             4'b0011: begin raw_reg = 6'b011110; reg_sz = 5; end // k=3
-             4'b0100: begin raw_reg = 6'b111110; reg_sz = 6; end // k=4
-             4'b0101: begin raw_reg = 6'b111111; reg_sz = 6; end // k=5
-             4'b1111: begin raw_reg = 6'b000001; reg_sz = 2; end // k=-1
-             4'b1110: begin raw_reg = 6'b000001; reg_sz = 3; end // k=-2
-             4'b1101: begin raw_reg = 6'b000001; reg_sz = 4; end // k=-3
-             4'b1100: begin raw_reg = 6'b000001; reg_sz = 5; end // k=-4
-             4'b1011: begin raw_reg = 6'b000001; reg_sz = 6; end // k=-5
-             4'b1010: begin raw_reg = 6'b000000; reg_sz = 6; end // k=-6
-             default: begin raw_reg = 6'b000000; reg_sz = 6; end
+             4'b0000: begin raw_reg = 11'b00000000010; reg_sz = 2; end // k=0
+             4'b0001: begin raw_reg = 11'b00000000110; reg_sz = 3; end // k=1
+             4'b0010: begin raw_reg = 11'b00000001110; reg_sz = 4; end // k=2
+             4'b0011: begin raw_reg = 11'b00000011110; reg_sz = 5; end // k=3
+             4'b0100: begin raw_reg = 11'b00000111110; reg_sz = 6; end // k=4
+             4'b0101: begin raw_reg = 11'b00001111110; reg_sz = 7; end // k=5
+             4'b0110: begin raw_reg = 11'b00011111110; reg_sz = 8; end // k=6
+             4'b0111: begin raw_reg = 11'b00111111110; reg_sz = 9; end // k=7
+             4'b1000: begin raw_reg = 11'b01111111110; reg_sz = 10; end // k=8
+             4'b1111: begin raw_reg = 11'b00000000001; reg_sz = 2; end // k=-1
+             4'b1110: begin raw_reg = 11'b00000000001; reg_sz = 3; end // k=-2
+             4'b1101: begin raw_reg = 11'b00000000001; reg_sz = 4; end // k=-3
+             4'b1100: begin raw_reg = 11'b00000000001; reg_sz = 5; end // k=-4
+             4'b1011: begin raw_reg = 11'b00000000001; reg_sz = 6; end // k=-5
+             4'b1010: begin raw_reg = 11'b00000000001; reg_sz = 7; end // k=-6
+             4'b1001: begin raw_reg = 11'b00000000001; reg_sz = 8; end // k=-7
+             default: begin raw_reg = (msb(k_val) == 0) ? 11'b11111111111 : 11'b00000000000; reg_sz = 11; end
          endcase
 
          // Apply sign XOR to regime
-         Bit#(6) final_reg = raw_reg ^ signExtend(p.sign);
+         Bit#(11) final_reg = raw_reg ^ signExtend(p.sign);
 
-         // Exponent is XORed with sign (5 bits for eS=5)
-         Bit#(5) raw_exp = p.scale[4:0] ^ signExtend(p.sign);
+         // Exponent is XORed with sign (4 bits for eS=4)
+         Bit#(4) raw_exp = p.scale[3:0] ^ signExtend(p.sign);
 
-         // Significand (raw_frac) is 24 bits for eS=5, N=32
-         Bit#(24) sig_bits = p.frac[23:0];
+         // Significand (raw_frac) is 25 bits for eS=4, N=32
+         Bit#(25) sig_bits = p.frac[24:0];
 
          // MUX for packing (31 bits)
          Bit#(31) packed_val = 0;
-         if (reg_sz == 2) packed_val = {final_reg[1:0], raw_exp, sig_bits[23:0]};
-         else if (reg_sz == 3) packed_val = {final_reg[2:0], raw_exp, sig_bits[23:1]};
-         else if (reg_sz == 4) packed_val = {final_reg[3:0], raw_exp, sig_bits[23:2]};
-         else if (reg_sz == 5) packed_val = {final_reg[4:0], raw_exp, sig_bits[23:3]};
-         else packed_val = {final_reg[5:0], raw_exp, sig_bits[23:4]};
+         if (reg_sz == 2) packed_val = {final_reg[1:0], raw_exp, sig_bits[24:0]};
+         else if (reg_sz == 3) packed_val = {final_reg[2:0], raw_exp, sig_bits[24:1]};
+         else if (reg_sz == 4) packed_val = {final_reg[3:0], raw_exp, sig_bits[24:2]};
+         else if (reg_sz == 5) packed_val = {final_reg[4:0], raw_exp, sig_bits[24:3]};
+         else if (reg_sz == 6) packed_val = {final_reg[5:0], raw_exp, sig_bits[24:4]};
+         else if (reg_sz == 7) packed_val = {final_reg[6:0], raw_exp, sig_bits[24:5]};
+         else if (reg_sz == 8) packed_val = {final_reg[7:0], raw_exp, sig_bits[24:6]};
+         else if (reg_sz == 9) packed_val = {final_reg[8:0], raw_exp, sig_bits[24:7]};
+         else if (reg_sz == 10) packed_val = {final_reg[9:0], raw_exp, sig_bits[24:8]};
+         else packed_val = {final_reg[10:0], raw_exp, sig_bits[24:9]};
 
          Bit#(32) final_posit = {p.sign, packed_val};
 
