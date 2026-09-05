@@ -46,7 +46,11 @@ import Posit_Numeric_Types :: *;
    typedef TAdd#(LogFracWidthMul4,1)               LogFracWidthMul4Plus1   ;//logFW4+1   
 
    //FDP
-   typedef TAdd#(TMul#(24, TExp#(ExpWidth)), 32) QuireWidth;//QW = (PW^2)/2
+   // Formula: Q_raw = 4 * rs * 2^es + 2 * (PositWidth - 1 - rs - es) + 30
+   // For es=6, rs=3, PositWidth=32: Q_raw = 842 bits.
+   // QuireWidth padded to multiple of 32 bits for segmented array packing: 864 bits.
+   typedef TAdd#(TAdd#(TMul#(4, TMul#(3, TExp#(ExpWidth))), TMul#(2, TSub#(TSub#(TSub#(PositWidth, 1), 3), ExpWidth))), 30) QuireWidthRaw;
+   typedef TMul#(TDiv#(TAdd#(QuireWidthRaw, 31), 32), 32) QuireWidth;
    typedef TSub#(QuireWidth,2)                  QuireWidthMinus2;//QW-2
    typedef TDiv#(QuireWidth,2)                  QuireWidthBy2;//QW/2
    typedef TDiv#(PositWidth,2)                  PositWidthBy2;//PW/2
